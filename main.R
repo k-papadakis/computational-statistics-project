@@ -31,14 +31,24 @@ while (n_sampled < N) {
 acceptance_rate <- n_sampled / n_trials
 
 cat(sprintf(
-  '\nTrue Acceptance Rate: %.4f\nEstimated Acceptance Rate: %.4f',
-  1/M, acceptance_rate
+  '
+True Acceptance Rate: %.4f
+Estimated Acceptance Rate: %.4f
+
+True Expected #Trials/Sample: %.4f:
+Estimated Expected #Trials/Sample: %.4f
+
+True Mean: %.4f
+Estimated Mean: %.4f
+
+True SD: %.4f
+Estimated SD: %.4f
+',
+  1/M, acceptance_rate,
+  M, 1/acceptance_rate,
+  0, mean(samples), 1, sd(samples)
 ))
 
-cat(sprintf(
-  '\n\nTrue Expected #Trials/Sample: %.4f\nEstimated Expected #Trials/Sample: %.4f',
-  M, 1/acceptance_rate
-))
 
 ggplot(data.frame(samples), aes(x=samples, y=..density..)) +
   geom_histogram(binwidth = 3.491 * 1 * N^(-1/3)) +  # slides 1, slide 11
@@ -53,10 +63,6 @@ ggplot(data.frame(samples), aes(x=samples, y=..density..)) +
 cat(sprintf(
   '\n\nTrue Mean: %.4f\nEstimated Mean: %.4f',
   0, mean(samples)
-))
-cat(sprintf(
-  '\n\nTrue SD: %.4f\nEstimated SD: %.4f',
-  1, sd(samples)
 ))
 
 
