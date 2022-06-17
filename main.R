@@ -84,33 +84,24 @@ raoblackwell_nbinom_mean <- function(n, r, p, seed = NULL) {
   ns <- 1 : n
   original <- cumsum(x) / ns
   raoblackwell <- cumsum(lambda) / ns
-  var_original <- r * p / (1-p)^2 / ns
-  var_raoblackwell <- r * p^2 / (1-p)^2 / ns  # p * var_original
   expected_value <- r * (1 - p) / p
   return(list(
     original = original,
     raoblackwell = raoblackwell,
-    var_original = var_original,
-    var_raoblackwell = var_raoblackwell,
     expected_value = expected_value
   ))
 }
 
+
 rb <- raoblackwell_nbinom_mean(n = 5000, r = 1, p = 0.5, seed = seed)
 
-ggplot(data = data.frame(ns = seq_along(rb$original), original=rb$original, raoblackwell=rb$raoblackwell), aes(ns))+
+ggplot(data = data.frame(ns = seq_along(rb$original),
+                         original=rb$original,
+                         raoblackwell=rb$raoblackwell),
+       aes(ns))+
   geom_line(aes(y = original, color = 'Original Estimator')) +
   geom_line(aes(y = raoblackwell, color = 'Rao-Blackwellized Estimator')) +
   geom_hline(aes(yintercept = rb$expected_value, color = 'Estimator Expected Value')) +
-  geom_ribbon(aes(ymin = original - rb$var_original,
-                  ymax = original + rb$var_original),
-              alpha = 0.3
-  ) +
-  geom_ribbon(aes(ymin = raoblackwell - rb$var_raoblackwell,
-                  ymax = raoblackwell + rb$var_raoblackwell),
-              alpha = 0.3
-  ) +
-  ylim(min(rb$original, rb$raoblackwell), max(rb$original, rb$raoblackwell)) +
   labs(title = 'Estimation of the Mean of a Negative Binomial distribution',
        x = 'Number of Samples', y = 'Estimator Value', color = '')
 
