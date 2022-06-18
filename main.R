@@ -107,4 +107,48 @@ ggplot(data = data.frame(ns = seq_along(rb$original),
 
 
 # 1.C
+# E[sum(X_i)^2] = V(sum(X_i)) + (E[sum(X_i)])^2 = n/12 + n^2/4
+# E[sum(X_i)^2 / n] = 1/12 + n/4
+
+
+generate_ts <- function(num_samples, n, seed=NULL) {
+  set.seed(seed)
+  ts <- array(dim=num_samples)
+  for (i in 1:num_samples) {
+    xs <- runif(n)
+    t <- sum(xs)^2 / n
+    ts[i] <- t
+  }
+  return(ts)
+}
+
+
+get_t_mean <- function(n) {n/4 + 1/12}
+
+
+ts <- generate_ts(num_samples = 10000, n = 80, seed=seed)
+# sum of 80 uniforms is essentially normal (mu=n/4 + 1/12)
+# https://en.wikipedia.org/wiki/Irwin%E2%80%93Hall_distribution
+# The square of it is non-central chi squared with lambda = (n/4 + 1/12)^2.
+# For large lambda, this becomes approximately normal
+# https://en.wikipedia.org/wiki/Noncentral_chi-squared_distribution#Properties
+# Then we just rescale by n, which still results into roughly a normal distribution
+
+IQR(ts)  # used for bin width
+
+ggplot(data.frame(ts), aes(x = ts, y = ..density..)) +
+  geom_histogram(binwidth = 3.491 * min(IQR(ts)/1.345, sd(ts)) * length(ts)^(-1/3)) +  # slides 1, slide 11
+  geom_density(aes(color = 'Gaussian KDE'),
+               kernel = 'epanechnikov',
+               key_glyph = draw_key_path) +
+  stat_function(fun = dnorm, args = list(mean = get_t_mean(80), sd = sd(ts)),
+                inherit.aes = FALSE,
+                aes(color = 'Normal Distribution'),
+                key_glyph = draw_key_path) +
+  labs(x = 'T', color = '')
+
+cat(sprintf(
+  '\nEstimated mean: %.4f\nTrue mean: %.4f\nEstimated SD: %.4f',
+  mean(ts), get_t_mean(80), sd(ts)
+))
 
