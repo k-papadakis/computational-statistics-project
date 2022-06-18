@@ -134,7 +134,10 @@ ts <- generate_ts(num_samples = 10000, n = 80, seed=seed)
 # https://en.wikipedia.org/wiki/Noncentral_chi-squared_distribution#Properties
 # Then we just rescale by n, which still results into roughly a normal distribution
 
-IQR(ts)  # used for bin width
+cat(sprintf(
+  '\nEstimated mean: %.4f\nTrue mean: %.4f\nEstimated SD: %.4f',
+  mean(ts), get_t_mean(80), sd(ts)
+))
 
 ggplot(data.frame(ts), aes(x = ts, y = ..density..)) +
   geom_histogram(binwidth = 3.491 * min(IQR(ts)/1.345, sd(ts)) * length(ts)^(-1/3)) +  # slides 1, slide 11
@@ -147,8 +150,5 @@ ggplot(data.frame(ts), aes(x = ts, y = ..density..)) +
                 key_glyph = draw_key_path) +
   labs(x = 'T', color = '')
 
-cat(sprintf(
-  '\nEstimated mean: %.4f\nTrue mean: %.4f\nEstimated SD: %.4f',
-  mean(ts), get_t_mean(80), sd(ts)
-))
+
 
