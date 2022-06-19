@@ -124,15 +124,19 @@ generate_ts <- function(num_samples, n, seed=NULL) {
 
 
 get_t_mean <- function(n) {n/4 + 1/12}
-
+get_t_var_approx <- function(n) {2*(1 + 2 * get_t_mean(n)^2) / n^2}
+sqrt(get_t_var_approx(80))
 
 ts <- generate_ts(num_samples = 10000, n = 80, seed=seed)
-# sum of 80 uniforms is essentially normal (mu=n/4 + 1/12)
+# sum of n=80 uniforms is essentially Normal(n/2, n/12) = sqrt(n/12) Normal(n/2, 1)
 # https://en.wikipedia.org/wiki/Irwin%E2%80%93Hall_distribution
-# The square of it is non-central chi squared with lambda = (n/4 + 1/12)^2.
-# For large lambda, this becomes approximately normal
+# The square of Normal(n/2, 1) is non-central chi squared with k=1, lambda = (n/2)^2.
+# For large lambda, this becomes approximately N(k+lambda, 2(k + 2 lambda))
 # https://en.wikipedia.org/wiki/Noncentral_chi-squared_distribution#Properties
-# Then we just rescale by n, which still results into roughly a normal distribution
+# Thus, approximately T ~ 1/n * sqrt(n/12) * Normal(1 + (n/2)^2, 2(1 + 2 (n/2)^2)
+# So, roughly we have sigma^2 ~= 2(1 + 2*(n/2)^2) * (1/n^2) * n/12 = n/12 + 1/(6n)
+# For n = 80, this evaluates to 2.582392.
+
 
 cat(sprintf(
   '\nEstimated mean: %.4f\nTrue mean: %.4f\nEstimated SD: %.4f',
