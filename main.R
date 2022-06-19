@@ -1,6 +1,5 @@
 library(ggplot2)
 
-
 seed <- 7
 
 # PART 1
@@ -109,7 +108,26 @@ ggplot(data = data.frame(ns = seq_along(rb$original),
 # 1.C
 # E[sum(X_i)^2] = V(sum(X_i)) + (E[sum(X_i)])^2 = n/12 + n^2/4
 # E[sum(X_i)^2 / n] = 1/12 + n/4
-
+# V[sum(X_i)^2 / n] = 1/n^2 (E[sum(X_i)^4] - E[sum(X_i)^2])
+# E[sum(X_i)^4] = sum(E[X_i X_j X_k X_l]) =
+#   = (n)_4 E[X]^4 +  # all indices i,j,k,l different
+#      + choose(4, 2) (n)_3 E[X]^2 E[X^2] +  # two same, two different
+#      + choose(4, 2)/2 (n)_2 E[X^2] E[X^2] +  # two same, two same
+#      + choose(4, 3) (n)_2 E[X^3] E[X^3] E[X] +  # three same
+#      + n E[X^4]  # all same
+# Using the fact that E[X^k] = 1 / (k+1) when X ~ U(0,1)
+# we finally get
+# V[sum(X_i)^2 / n] = (5 - 3/n + 30*n) / 360
+#
+# Now, considering the distribution of T:
+# sum of n=80 uniforms is essentially Normal(n/2, n/12) = sqrt(n/12) Normal(n/2, 1)
+# https://en.wikipedia.org/wiki/Irwin%E2%80%93Hall_distribution
+# The square of Normal(n/2, 1) is non-central chi squared with k=1, lambda = (n/2)^2.
+# For large lambda, this becomes approximately N(k+lambda, 2(k + 2 lambda))
+# https://en.wikipedia.org/wiki/Noncentral_chi-squared_distribution#Properties
+# Thus, approximately T ~ 1/n * sqrt(n/12) * Normal(1 + (n/2)^2, 2(1 + 2 (n/2)^2)
+# So, roughly we have sigma^2 ~= 2(1 + 2*(n/2)^2) * (1/n^2) * n/12 = n/12 + 1/(6n)
+# For n = 80, this evaluates to 2.582392.
 
 generate_ts <- function(num_samples, n, seed=NULL) {
   set.seed(seed)
@@ -121,26 +139,22 @@ generate_ts <- function(num_samples, n, seed=NULL) {
   }
   return(ts)
 }
-
-
 get_t_mean <- function(n) {n/4 + 1/12}
-get_t_var_approx <- function(n) {2*(1 + 2 * get_t_mean(n)^2) / n^2}
-sqrt(get_t_var_approx(80))
+get_t_sd <- function(n) {sqrt((5 - 3/n + 30*n) / 360)}  # Exact value
+
 
 ts <- generate_ts(num_samples = 10000, n = 80, seed=seed)
-# sum of n=80 uniforms is essentially Normal(n/2, n/12) = sqrt(n/12) Normal(n/2, 1)
-# https://en.wikipedia.org/wiki/Irwin%E2%80%93Hall_distribution
-# The square of Normal(n/2, 1) is non-central chi squared with k=1, lambda = (n/2)^2.
-# For large lambda, this becomes approximately N(k+lambda, 2(k + 2 lambda))
-# https://en.wikipedia.org/wiki/Noncentral_chi-squared_distribution#Properties
-# Thus, approximately T ~ 1/n * sqrt(n/12) * Normal(1 + (n/2)^2, 2(1 + 2 (n/2)^2)
-# So, roughly we have sigma^2 ~= 2(1 + 2*(n/2)^2) * (1/n^2) * n/12 = n/12 + 1/(6n)
-# For n = 80, this evaluates to 2.582392.
-
 
 cat(sprintf(
-  '\nEstimated mean: %.4f\nTrue mean: %.4f\nEstimated SD: %.4f',
-  mean(ts), get_t_mean(80), sd(ts)
+  '
+  Estimated mean: %.4f
+  True mean: %.4f
+
+  Estimated SD: %.4f
+  True SD: %.4f
+  ',
+  mean(ts), get_t_mean(80),
+  sd(ts), get_t_sd(80)
 ))
 
 ggplot(data.frame(ts), aes(x = ts, y = ..density..)) +
@@ -148,13 +162,96 @@ ggplot(data.frame(ts), aes(x = ts, y = ..density..)) +
   geom_density(aes(color = 'Gaussian KDE'),
                kernel = 'epanechnikov',
                key_glyph = draw_key_path) +
-  stat_function(fun = dnorm, args = list(mean = get_t_mean(80), sd = sd(ts)),
+  stat_function(fun = dnorm, args = list(mean = get_t_mean(80), sd = get_t_sd(80)),
                 inherit.aes = FALSE,
                 aes(color = 'Normal Distribution'),
                 key_glyph = draw_key_path) +
   labs(x = 'T', color = '')
 
 
+# 1.D
+bootstrap <- function(data, statistic, R) {
+  t <- numeric(R)
+  for (i in 1:R) {
+    indices <- sample(seq_along(data), length(data), replace = TRUE)
+    t[i] <- statistic(data, indices)
+  }
+  return(list(
+    t = t,
+    data = data,
+    statistic = statistic
+  ))
+}
 
 
+jackknife <- function(data, statistic) {
+  t_leaveoneout <- numeric(length(data))
+  for (i in seq_along(data)) {
+    t_leaveoneout[i] <- statistic(data[-i])
+  }
+  t_entire <- statistic(data)
+  n <- length(data)
 
+  t_leaveoneout_mean <- mean(t_leaveoneout)
+  jkval <- n * t_entire - (n - 1) * t_leaveoneout_mean
+  # Estimates about properties of the original estimator
+  bias <- (n - 1) * (t_leaveoneout_mean - t_entire)
+  se <- sqrt((n-1) * mean((t_leaveoneout - t_leaveoneout_mean)^2))
+  # values <- t_leaveoneout
+  return(list(
+    val = jkval,
+    vals = t_leaveoneout,
+    bias = bias,
+    se = se,
+    statistic = statistic
+  ))
+}
+
+
+t_statistic <- function(data, indices = NULL) {
+  if (is.null(indices)) {
+    indices <- seq_along(data)
+  }
+  sample <- data[indices]
+  t <- sum(sample)^2 / length(sample)
+  return(t)
+}
+
+
+xs <- readRDS('data1.rds')
+
+# Bootstrap
+set.seed(seed)
+bs <- bootstrap(xs, t_statistic, 10000)
+ts_boot <- bs$t
+
+# Jackknife
+jk <- jackknife(xs, t_statistic)
+
+cat(sprintf(
+  '
+  Bootstrap Estimate of SE: %.4f
+  Jackknife Estimate of SE: %.4f
+  ',
+  sd(bs$t), jk$se
+))
+
+ggplot(
+  data.frame(
+    T = c(ts, bs$t),
+    Method = rep(c('Regular', 'Bootstrap'), each=length(ts))
+  ),
+  aes(T, ..density.., fill = Method)
+) +
+  geom_histogram(
+    binwidth = 3.491 * min(IQR(ts)/1.345, sd(ts)) * length(ts)^(-1/3),
+    alpha = 0.3,
+    position = 'identity'
+  )  +
+  stat_function(
+    fun = dnorm, args = list(mean = get_t_mean(80), sd = get_t_sd(80)),
+    inherit.aes = FALSE,
+    color = 'black',
+    alpha = 0.9,
+    key_glyph = draw_key_path
+  )
