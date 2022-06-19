@@ -147,11 +147,11 @@ ts <- generate_ts(num_samples = 10000, n = 80, seed=seed)
 
 cat(sprintf(
   '
-  Estimated mean: %.4f
-  True mean: %.4f
+Estimated mean: %.4f
+True mean: %.4f
 
-  Estimated SD: %.4f
-  True SD: %.4f
+Estimated SD: %.4f
+True SD: %.4f
   ',
   mean(ts), get_t_mean(80),
   sd(ts), get_t_sd(80)
@@ -170,8 +170,9 @@ ggplot(data.frame(ts), aes(x = ts, y = ..density..)) +
 
 
 # 1.D
-bootstrap <- function(data, statistic, R) {
+bootstrap <- function(data, statistic, R, seed = NULL) {
   t <- numeric(R)
+  set.seed(seed)
   for (i in 1:R) {
     indices <- sample(seq_along(data), length(data), replace = TRUE)
     t[i] <- statistic(data, indices)
@@ -221,8 +222,7 @@ t_statistic <- function(data, indices = NULL) {
 xs <- readRDS('data1.rds')
 
 # Bootstrap
-set.seed(seed)
-bs <- bootstrap(xs, t_statistic, 10000)
+bs <- bootstrap(xs, t_statistic, 10000, seed = seed)
 ts_boot <- bs$t
 
 # Jackknife
@@ -230,8 +230,8 @@ jk <- jackknife(xs, t_statistic)
 
 cat(sprintf(
   '
-  Bootstrap Estimate of SE: %.4f
-  Jackknife Estimate of SE: %.4f
+Bootstrap Estimate of SE: %.4f
+Jackknife Estimate of SE: %.4f
   ',
   sd(bs$t), jk$se
 ))
@@ -255,3 +255,8 @@ ggplot(
     alpha = 0.9,
     key_glyph = draw_key_path
   )
+
+
+# PART 2
+
+
