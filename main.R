@@ -74,35 +74,105 @@ ggplot(data.frame(rs$samples), aes(x = rs$samples, y = ..density..)) +
 
 
 # 1.B
-
-raoblackwell_nbinom_mean <- function(n, r, p, seed = NULL) {
+raoblackwell_nbinom_mean <- function(n, r, p, n_iter = 1, seed = NULL) {
   # p is the probability of failure
   set.seed(seed)
-  x <- rnbinom(n, size = r, prob = p)
-  lambda <- rgamma(n, shape = r, scale = (1 - p) / p)
+
+  original <- array(dim = c(n, n_iter))
+  improved <- array(dim = c(n, n_iter))
   ns <- 1 : n
-  original <- cumsum(x) / ns
-  raoblackwell <- cumsum(lambda) / ns
-  expected_value <- r * (1 - p) / p
+
+  for (iter in 1:n_iter) {
+    lambda <- rgamma(n, shape = r, scale = (1 - p) / p)
+    x <- rpois(n, lambda)
+    original[, iter] <- cumsum(x) / ns
+    improved[, iter] <- cumsum(lambda) / ns
+  }
+
   return(list(
+    ns = ns,
     original = original,
-    raoblackwell = raoblackwell,
-    expected_value = expected_value
+    improved = improved,
+    est_mean_original = apply(original, 1, mean),
+    est_mean_improved = apply(improved, 1, mean),
+    true_mean = r * (1 - p) / p,
+    est_var_original = apply(original, 1, var),
+    est_var_improved = apply(improved, 1, var),
+    true_var_original = function(n) {r * p/(1-p^2) / n},
+    true_var_improved = function(n) {r * p^2/(1-p^2) / n}
   ))
 }
 
 
-rb <- raoblackwell_nbinom_mean(n = 5000, r = 1, p = 0.5, seed = seed)
+rb <- raoblackwell_nbinom_mean(n = 5000, r = 1, p = 0.5, n_iter = 100, seed = seed)
+# var_ratio <- rb$est_var_improved / rb$est_var_original
 
-ggplot(data = data.frame(ns = seq_along(rb$original),
-                         original=rb$original,
-                         raoblackwell=rb$raoblackwell),
-       aes(ns))+
-  geom_line(aes(y = original, color = 'Original Estimator')) +
-  geom_line(aes(y = raoblackwell, color = 'Rao-Blackwellized Estimator')) +
-  geom_hline(aes(yintercept = rb$expected_value, color = 'Estimator Expected Value')) +
-  labs(title = 'Estimation of the Mean of a Negative Binomial distribution',
-       x = 'Number of Samples', y = 'Estimator Value', color = '')
+n_skip <- 100
+realization_id <- 2
+
+# Plot a single realization for delta_n (all n)
+ggplot(
+  data.frame(
+    n = rb$ns[-(1:n_skip)],
+    estimator_value = c(
+      rb$original[-(1:n_skip), realization_id],
+      rb$improved[-(1:n_skip), realization_id]
+    ),
+    estimator_type = rep(
+      c('Original', 'Rao-Blackwellized'),
+      each = length(rb$est_var_original) - n_skip
+    )
+  ),
+  aes(x = n, y = estimator_value, color = estimator_type),
+) +
+  geom_line() +
+  geom_hline(
+    aes(
+      yintercept = rb$true_mean,
+      color = 'Estimator Expected Value')
+  ) +
+  labs(
+    x = 'n', y = 'Estimator Value',
+    title = 'Estimation of the Mean',
+    color = 'Estimator Type',
+    linetype = 'Value'
+  )
+
+# Plot the variance of the realizations of the delta_n's (all n)
+ggplot(
+  data.frame(
+    n = rb$ns[-(1:n_skip)],
+    estimated_estimator_var = c(
+      rb$est_var_original[-(1:n_skip)],
+      rb$est_var_improved[-(1:n_skip)]
+    ),
+    estimator_type = rep(
+      c('Original', 'Rao-Blackwellized'),
+      each = length(rb$est_var_original) - n_skip
+    ),
+    true_estimator_var = c(
+      rb$true_var_original(rb$ns[-(1:n_skip)]),
+      rb$true_var_improved(rb$ns[-(1:n_skip)])
+    )
+  ),
+  aes(x = n, color = estimator_type)
+) +
+  geom_line(
+    aes(
+      y = estimated_estimator_var,
+      linetype = 'Estimated'
+    )
+  ) +
+  geom_line(aes(y = true_estimator_var, linetype = 'Real')) +
+  labs(
+    x = 'n', y = 'Estimator Variance',
+    title = 'Rao-Blackwellization',
+    color = 'Estimator Type',
+    linetype = 'Estimator Variance'
+  )
+
+
+
 
 
 # 1.C
@@ -171,8 +241,8 @@ ggplot(data.frame(ts), aes(x = ts, y = ..density..)) +
 
 # 1.D
 bootstrap <- function(data, statistic, R, seed = NULL) {
-  t <- numeric(R)
   set.seed(seed)
+  t <- numeric(R)
   for (i in 1:R) {
     indices <- sample(seq_along(data), length(data), replace = TRUE)
     t[i] <- statistic(data, indices)
