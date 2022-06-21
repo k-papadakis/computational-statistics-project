@@ -98,8 +98,8 @@ raoblackwell_nbinom_mean <- function(n, r, p, n_iter = 1, seed = NULL) {
     true_mean = r * (1 - p) / p,
     est_var_original = apply(original, 1, var),
     est_var_improved = apply(improved, 1, var),
-    true_var_original = function(n) {r * p/(1-p^2) / n},
-    true_var_improved = function(n) {r * p^2/(1-p^2) / n}
+    true_var_original = function(n) {r * p/(1-p)^2 / n},
+    true_var_improved = function(n) {r * p^2/(1-p)^2 / n}
   ))
 }
 
